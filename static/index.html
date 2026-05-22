@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ekiden Picker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #f4f2ed;
+      --surface: #ffffff;
+      --surface2:#eceae5;
+      --border:  #dedad2;
+      --border2: #ccc8bf;
+      --text:    #1a1814;
+      --muted:   #9a9590;
+      --accent:  #b8890a;
+      --t1:      #FF3B30;
+      --t2:      #007AFF;
+      --t3:      #30D158;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 2rem 3rem 1.75rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      gap: 1.5rem;
+    }
+
+    .logo {
+      font-family: 'Anton', sans-serif;
+      font-size: clamp(3rem, 8vw, 5.5rem);
+      line-height: 0.9;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .logo em { color: var(--accent); font-style: normal; }
+
+    .tagline {
+      font-size: 0.6rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding-bottom: 0.5rem;
+      line-height: 1.7;
+    }
+
+    /* ── Bench ── */
+    .bench-wrap {
+      padding: 1.5rem 3rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .zone-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.85rem;
+    }
+
+    .bench-zone {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      min-height: 3rem;
+      padding: 0.6rem;
+      border-radius: 5px;
+      border: 1.5px dashed transparent;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .bench-zone.drag-over {
+      border-color: var(--muted);
+      background: rgba(0,0,0,0.03);
+    }
+
+    /* ── Chips ── */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.9rem 0.45rem 0.65rem;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text);
+      cursor: grab;
+      user-select: none;
+      transition: transform 0.14s cubic-bezier(.2,.8,.4,1), box-shadow 0.14s, opacity 0.14s;
+      animation: slideUp 0.32s cubic-bezier(.2,.8,.4,1) both;
+    }
+
+    .chip::before {
+      content: '⠿';
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+
+    .chip:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      border-color: var(--border2);
+    }
+
+    .chip:active { cursor: grabbing; }
+
+    .chip.dragging {
+      opacity: 0.25;
+      transform: scale(0.93);
+    }
+
+    /* Team-tinted chip left border */
+    [data-team="1"] .chip { border-left: 3px solid var(--t1); }
+    [data-team="2"] .chip { border-left: 3px solid var(--t2); }
+    [data-team="3"] .chip { border-left: 3px solid var(--t3); }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Teams grid ── */
+    .teams-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      flex: 1;
+      gap: 1px;
+      background: var(--border);
+    }
+
+    .team {
+      background: var(--surface);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Ghost number */
+    .team-ghost {
+      position: absolute;
+      bottom: -0.1em;
+      right: -0.05em;
+      font-family: 'Anton', sans-serif;
+      font-size: 13rem;
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    [data-team="1"] .team-ghost { color: rgba(255,59,48,0.07); }
+    [data-team="2"] .team-ghost { color: rgba(0,122,255,0.07); }
+    [data-team="3"] .team-ghost { color: rgba(48,209,88,0.07); }
+
+    /* Team header */
+    .team-header {
+      padding: 2rem 2rem 1.5rem;
+      position: relative;
+      z-index: 1;
+      transition: background 0.35s ease;
+    }
+
+    .team-header.complete {
+      background: #d6f5e0;
+    }
+
+    .team-header.complete .team-name {
+      color: #1a6b38;
+    }
+
+    .team-header.complete .team-captain {
+      color: #2e8a4f;
+    }
+
+    .team-bar {
+      width: 32px;
+      height: 3px;
+      border-radius: 2px;
+      margin-bottom: 1rem;
+    }
+
+    [data-team="1"] .team-bar { background: var(--t1); }
+    [data-team="2"] .team-bar { background: var(--t2); }
+    [data-team="3"] .team-bar { background: var(--t3); }
+
+    .team-name {
+      font-family: 'Anton', sans-serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.04em;
+      line-height: 1.15;
+    }
+
+    .team-captain {
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 0.45rem;
+    }
+
+    /* ── Leg sections ── */
+    .legs {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      position: relative;
+      z-index: 1;
+    }
+
+    .leg {
+      border-top: 1px solid var(--border);
+      padding: 1rem 2rem 1.25rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .leg-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .leg-dist {
+      font-family: 'Anton', sans-serif;
+      font-size: 1rem;
+      letter-spacing: 0.06em;
+      color: var(--text);
+    }
+
+    .leg-tag {
+      font-size: 0.55rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .leg-zone {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 0.45rem;
+      min-height: 2.25rem;
+      padding: 0.35rem;
+      border-radius: 4px;
+      border: 1px dashed transparent;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .leg-zone.drag-over {
+      border-color: var(--border2);
+      background: rgba(0,0,0,0.03);
+    }
+
+    /* Tint the active leg zone border by team color */
+    [data-team="1"] .leg-zone.drag-over { border-color: rgba(255,59,48,0.35); }
+    [data-team="2"] .leg-zone.drag-over { border-color: rgba(0,122,255,0.35); }
+    [data-team="3"] .leg-zone.drag-over { border-color: rgba(48,209,88,0.35); }
+
+    .drop-hint {
+      font-size: 0.58rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      align-self: center;
+      padding: 0.2rem 0;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .leg-zone.drag-over .drop-hint:only-child,
+    .bench-zone.drag-over .drop-hint:only-child {
+      opacity: 1;
+    }
+
+    /* ── Save dot ── */
+    .save-dot {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.25rem;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--t3);
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+
+    .save-dot.saving { background: var(--accent); opacity: 1; }
+    .save-dot.saved  { background: var(--t3); opacity: 1; animation: fadeOut 1.4s forwards 0.3s; }
+
+    @keyframes fadeOut { to { opacity: 0; } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1 class="logo">EKI<em>D</em>EN</h1>
+    <div class="tagline">Team Picker<br>Relay Race Planner</div>
+  </header>
+
+  <div class="bench-wrap">
+    <div class="zone-label">Unassigned</div>
+    <div class="bench-zone" id="bench">
+      <span class="drop-hint">Drop here to unassign</span>
+    </div>
+  </div>
+
+  <div class="teams-grid">
+
+    <div class="team" data-team="1">
+      <div class="team-header">
+        <div class="team-bar"></div>
+        <div class="team-name">GREASED YORK RUNNERS</div>
+        <div class="team-captain">Captain: Colm</div>
+      </div>
+      <div class="legs">
+        <div class="leg">
+          <div class="leg-header">
+            <span class="leg-dist">10K</span>
+            <span class="leg-tag">Leg 1</span>
+          </div>
+          <div class="leg-zone" id="zone-1-10k" data-team="1" data-leg="10k">
+            <span class="drop-hint">Drop runner</span>
+          </div>
+        </div>
+        <div class="leg">
+          <div class="leg-header">
+            <span class="leg-dist">5K</span>
+            <span class="leg-tag">Leg 2</span>
+          </div>
+          <div class="leg-zone" id="zone-1-5k" data-team="1" data-leg="5k">
+            <span class="drop-hint">Drop runner</span>
+          </div>
+        </div>
+        <div class="leg">
+          <div class="leg-header">
+            <span class="leg-dist">7.2K</span>
+            <span class="leg-tag">Leg 3</span>
+          </div>
+          <div class="leg-zone" id="zone-1-7.2k" data-team="1" data-leg="7.2k">
+            <span class="drop-hint">Drop runner</span>
+          </div>
+        </div>
+      </div>
+      <div class="team-ghost" aria-hidden="true">1</div>
+    </div>
+
+    <div class="team" data-team="2">
+      <div class="team-header">
+        <div class="team-bar"></div>
+        <div class="team-name">EAST YORK STUNNERS</div>
+        <div class="team-captain">Captain: Mike</div>
+      </div>
+      <div class="legs">
+        <div class="leg">
+          <div class="leg-header">
+            <span class="leg-dist">10K</span>
+            <span class="leg-tag">Leg 1</span>
+          </div>
+          <div class="leg-zone" id="zone-2-10k" data-team="2" data-leg="10k">
+            <span class="drop-hint">Drop runner</span>
+          </div>
+        </div>
+        <div class="leg">
+          <div class="leg-header">
+            <span class="leg-dist">5K</span>
+            <span class="leg-tag">Leg 2</span>
+          </div>
+          <div class="leg-zone" id="zone-2-5k" data-team="2" data-leg="5k">
+            <span class="drop-hint">Drop runner</span>
+          </div>
+        </div>
+        <div class="leg">
+          <div class="leg-header">
+            <span class="leg-dist">7.2K</span>
+            <span class="leg-tag">Leg 3</span>
+          </div>
+          <div class="leg-zone" id="zone-2-7.2k" data-team="2" data-leg="7.2k">
+            <span class="drop-hint">Drop runner</span>
+          </div>
+        </div>
+      </div>
+      <div class="team-ghost" aria-hidden="true">2</div>
+    </div>
+
+    <div class="team" data-team="3">
+      <div class="team-header">
+        <div class="team-bar"></div>
+        <div class="team-name">EAST YORK THUNDER</div>
+        <div class="team-captain">Captain: Aaron</div>
+      </div>
+      <div class="legs">
+        <div class="leg">
+          <div class="leg-header">
+            <span class="leg-dist">10K</span>
+            <span class="leg-tag">Leg 1</span>
+          </div>
+          <div class="leg-zone" id="zone-3-10k" data-team="3" data-leg="10k">
+            <span class="drop-hint">Drop runner</span>
+          </div>
+        </div>
+        <div class="leg">
+          <div class="leg-header">
+            <span class="leg-dist">5K</span>
+            <span class="leg-tag">Leg 2</span>
+          </div>
+          <div class="leg-zone" id="zone-3-5k" data-team="3" data-leg="5k">
+            <span class="drop-hint">Drop runner</span>
+          </div>
+        </div>
+        <div class="leg">
+          <div class="leg-header">
+            <span class="leg-dist">7.2K</span>
+            <span class="leg-tag">Leg 3</span>
+          </div>
+          <div class="leg-zone" id="zone-3-7.2k" data-team="3" data-leg="7.2k">
+            <span class="drop-hint">Drop runner</span>
+          </div>
+        </div>
+      </div>
+      <div class="team-ghost" aria-hidden="true">3</div>
+    </div>
+
+  </div>
+
+  <div class="save-dot" id="save-dot"></div>
+
+  <script>
+    const LEGS = ['10k', '5k', '7.2k'];
+    const REQUIRED = { '10k': 2, '5k': 3, '7.2k': 1 };
+    let draggingName = null;
+
+    function checkAllTeams() {
+      for (let t = 1; t <= 3; t++) {
+        const complete = LEGS.every(leg => {
+          const zone = document.getElementById(`zone-${t}-${leg}`);
+          return zone && zone.querySelectorAll('.chip').length === REQUIRED[leg];
+        });
+        document.querySelector(`.team[data-team="${t}"] .team-header`)
+          .classList.toggle('complete', complete);
+      }
+    }
+
+    const saveDot = document.getElementById('save-dot');
+    function showSaving() { saveDot.className = 'save-dot saving'; }
+    function showSaved()  { saveDot.className = 'save-dot saved'; }
+
+    function makeChip(name, index = 0) {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.textContent = name;
+      chip.draggable = true;
+      chip.dataset.name = name;
+      chip.style.animationDelay = `${index * 55}ms`;
+
+      chip.addEventListener('dragstart', e => {
+        draggingName = name;
+        setTimeout(() => chip.classList.add('dragging'), 0);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', name);
+      });
+
+      chip.addEventListener('dragend', () => {
+        chip.classList.remove('dragging');
+        draggingName = null;
+      });
+
+      return chip;
+    }
+
+    function bindZone(el, team, leg) {
+      // team: 1/2/3 or null (bench); leg: '10k'/'5k'/'7.2k' or null
+      el.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        el.classList.add('drag-over');
+      });
+
+      el.addEventListener('dragleave', e => {
+        if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over');
+      });
+
+      el.addEventListener('drop', async e => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        const name = e.dataTransfer.getData('text/plain') || draggingName;
+        if (!name) return;
+
+        const oldChip = document.querySelector(`.chip[data-name="${CSS.escape(name)}"]`);
+        if (oldChip) oldChip.remove();
+
+        const allChips = el.querySelectorAll('.chip');
+        el.appendChild(makeChip(name, allChips.length));
+
+        checkAllTeams();
+        showSaving();
+        try {
+          await fetch('/api/assign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              team: team ? parseInt(team) : null,
+              leg: leg ?? null,
+            }),
+          });
+          showSaved();
+        } catch { showSaved(); }
+      });
+    }
+
+    async function init() {
+      // Bind bench
+      bindZone(document.getElementById('bench'), null, null);
+
+      // Bind all leg zones
+      for (let t = 1; t <= 3; t++) {
+        for (const leg of LEGS) {
+          const zone = document.getElementById(`zone-${t}-${leg}`);
+          if (zone) bindZone(zone, t, leg);
+        }
+      }
+
+      // Load and render state
+      const res = await fetch('/api/state');
+      const state = await res.json();
+
+      state.forEach((item, i) => {
+        const chip = makeChip(item.name, i);
+        if (item.team && item.leg) {
+          const zone = document.getElementById(`zone-${item.team}-${item.leg}`);
+          if (zone) { zone.appendChild(chip); return; }
+        }
+        document.getElementById('bench').appendChild(chip);
+      });
+
+      checkAllTeams();
+    }
+
+    init();
+  </script>
+</body>
+</html>
