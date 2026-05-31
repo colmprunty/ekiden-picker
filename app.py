@@ -11,7 +11,7 @@ DB_PATH = os.environ.get(
 INITIAL_NAMES = [
     "Aaron", "Steph", "Chris", "Colm", "Neeraj", "Kerry",
     "Daniel", "Karolina", "Zenobia", "Isaac", "Eric", "Diana",
-    "Rajesh", "Mike", "Sasa", "Thomas",
+    "Rajesh", "Mike", "Sasa", "Thomas", "Bronwen",
 ]
 
 
